@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"log"
 
-	//"github.com/sendgrid/dapclient"
 	"github.com/sendgrid/DapClientCreator/client"
 )
 
@@ -17,6 +16,27 @@ func main() {
 	if err != nil {
 		log.Fatalf("Cannot create client: %v", err)
 	}
+
+	log.Println("client created. attempting post...")
+	setter := client.CustomFooPOST()
+	setter.SetSample_property("this is my sample property")
+	setterResponse, err := setter.Do()
+	if err != nil {
+		log.Println("error with CustomFooPOST ", err)
+	}
+	log.Println(setterResponse.StatusCode)
+	setterResponseBody, _ := ioutil.ReadAll(setterResponse.Body)
+	log.Printf("%s\n", setterResponseBody)
+
+	getter := client.CustomFooGET()
+	getter.SetSample_property("this is my sample property")
+	getterResponse, err := getter.Do()
+	if err != nil {
+		log.Println("error with CustomFooGET ", err)
+	}
+	log.Println(getterResponse.StatusCode)
+	getterResponseBody, _ := ioutil.ReadAll(getterResponse.Body)
+	log.Printf("%s\n", getterResponseBody)
 
 	log.Println("Get Settings...")
 
