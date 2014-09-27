@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 func (c *Client) UserPOST() *UserPOSTstruct {
@@ -13,9 +15,9 @@ func (c *Client) UserPOST() *UserPOSTstruct {
 }
 
 type UserPOSTstruct struct {
-	ArgName  *string `json:"name,omitempty"`
 	ArgEmail *string `json:"email,omitempty"`
 	ArgId    *int    `json:"id,omitempty"`
+	ArgName  *string `json:"name,omitempty"`
 
 	httpClient *http.Client
 	response   *http.Response
@@ -47,8 +49,22 @@ func (x *UserPOSTstruct) Do() (*http.Response, error) {
 		log.Fatalf("error marshalling %v", err)
 	}
 	body := bytes.NewReader(json)
-	//request, err := http.NewRequest(x.Method(), x.dapAddr+x.Location(), body)
-	request, err := http.NewRequest(x.Method(), "http://"+x.Location(), body)
+
+	// location may have parameters in it (/blah/:foo/blah/:bar)
+	// these must match to an Arg value on the struct and be replaced.
+	l := x.Location()
+	strconv.ParseBool("true")
+	if x.ArgId != nil {
+		l = strings.Replace(l, ":id", strconv.Itoa(*x.ArgId), -1)
+	}
+	if x.ArgName != nil {
+		l = strings.Replace(l, ":name", *x.ArgName, -1)
+	}
+	if x.ArgEmail != nil {
+		l = strings.Replace(l, ":email", *x.ArgEmail, -1)
+	}
+
+	request, err := http.NewRequest(x.Method(), "http://"+l, body)
 	if err != nil {
 		// TODO: proper error handling
 		log.Fatalf("error with new request %v", err)

@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 func (c *Client) SettingsDELETE() *SettingsDELETEstruct {
@@ -25,11 +27,11 @@ type SettingsDELETEstruct struct {
 }
 
 type SettingsDELETEresponse struct {
+	Limit   string `json:"limit"`
 	Setting string `json:"setting"`
 	User_id string `json:"user_id"`
 	Enabled string `json:"enabled"`
 	Id      string `json:"id"`
-	Limit   string `json:"limit"`
 }
 
 func (x *SettingsDELETEstruct) Method() string {
@@ -51,8 +53,28 @@ func (x *SettingsDELETEstruct) Do() (*http.Response, error) {
 		log.Fatalf("error marshalling %v", err)
 	}
 	body := bytes.NewReader(json)
-	//request, err := http.NewRequest(x.Method(), x.dapAddr+x.Location(), body)
-	request, err := http.NewRequest(x.Method(), "http://"+x.Location(), body)
+
+	// location may have parameters in it (/blah/:foo/blah/:bar)
+	// these must match to an Arg value on the struct and be replaced.
+	l := x.Location()
+	strconv.ParseBool("true")
+	if x.ArgSetting != nil {
+		l = strings.Replace(l, ":setting", *x.ArgSetting, -1)
+	}
+	if x.ArgUser_id != nil {
+		l = strings.Replace(l, ":user_id", strconv.Itoa(*x.ArgUser_id), -1)
+	}
+	if x.ArgEnabled != nil {
+		l = strings.Replace(l, ":enabled", strconv.FormatBool(*x.ArgEnabled), -1)
+	}
+	if x.ArgId != nil {
+		l = strings.Replace(l, ":id", strconv.Itoa(*x.ArgId), -1)
+	}
+	if x.ArgLimit != nil {
+		l = strings.Replace(l, ":limit", strconv.Itoa(*x.ArgLimit), -1)
+	}
+
+	request, err := http.NewRequest(x.Method(), "http://"+l, body)
 	if err != nil {
 		// TODO: proper error handling
 		log.Fatalf("error with new request %v", err)
@@ -111,6 +133,10 @@ func (x *SettingsDELETEstruct) Failure() *ErrorResponse {
 
 // accessor functions
 
+func (x *SettingsDELETEstruct) SetEnabled(enabled bool) {
+	x.ArgEnabled = &enabled
+}
+
 func (x *SettingsDELETEstruct) SetId(id int) {
 	x.ArgId = &id
 }
@@ -125,8 +151,4 @@ func (x *SettingsDELETEstruct) SetSetting(setting string) {
 
 func (x *SettingsDELETEstruct) SetUser_id(user_id int) {
 	x.ArgUser_id = &user_id
-}
-
-func (x *SettingsDELETEstruct) SetEnabled(enabled bool) {
-	x.ArgEnabled = &enabled
 }

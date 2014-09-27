@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 func (c *Client) UserGET() *UserGETstruct {
@@ -13,11 +15,11 @@ func (c *Client) UserGET() *UserGETstruct {
 }
 
 type UserGETstruct struct {
-	ArgEmail  *string `json:"email,omitempty"`
-	ArgId     *int    `json:"id,omitempty"`
 	ArgLimit  *int    `json:"limit,omitempty"`
 	ArgName   *string `json:"name,omitempty"`
 	ArgOffset *int    `json:"offset,omitempty"`
+	ArgEmail  *string `json:"email,omitempty"`
+	ArgId     *int    `json:"id,omitempty"`
 
 	httpClient *http.Client
 	response   *http.Response
@@ -25,11 +27,11 @@ type UserGETstruct struct {
 }
 
 type UserGETresponse struct {
+	Offset string `json:"offset"`
 	Email  string `json:"email"`
 	Id     string `json:"id"`
 	Limit  string `json:"limit"`
 	Name   string `json:"name"`
-	Offset string `json:"offset"`
 }
 
 func (x *UserGETstruct) Method() string {
@@ -51,8 +53,28 @@ func (x *UserGETstruct) Do() (*http.Response, error) {
 		log.Fatalf("error marshalling %v", err)
 	}
 	body := bytes.NewReader(json)
-	//request, err := http.NewRequest(x.Method(), x.dapAddr+x.Location(), body)
-	request, err := http.NewRequest(x.Method(), "http://"+x.Location(), body)
+
+	// location may have parameters in it (/blah/:foo/blah/:bar)
+	// these must match to an Arg value on the struct and be replaced.
+	l := x.Location()
+	strconv.ParseBool("true")
+	if x.ArgEmail != nil {
+		l = strings.Replace(l, ":email", *x.ArgEmail, -1)
+	}
+	if x.ArgId != nil {
+		l = strings.Replace(l, ":id", strconv.Itoa(*x.ArgId), -1)
+	}
+	if x.ArgLimit != nil {
+		l = strings.Replace(l, ":limit", strconv.Itoa(*x.ArgLimit), -1)
+	}
+	if x.ArgName != nil {
+		l = strings.Replace(l, ":name", *x.ArgName, -1)
+	}
+	if x.ArgOffset != nil {
+		l = strings.Replace(l, ":offset", strconv.Itoa(*x.ArgOffset), -1)
+	}
+
+	request, err := http.NewRequest(x.Method(), "http://"+l, body)
 	if err != nil {
 		// TODO: proper error handling
 		log.Fatalf("error with new request %v", err)
@@ -111,10 +133,6 @@ func (x *UserGETstruct) Failure() *ErrorResponse {
 
 // accessor functions
 
-func (x *UserGETstruct) SetOffset(offset int) {
-	x.ArgOffset = &offset
-}
-
 func (x *UserGETstruct) SetEmail(email string) {
 	x.ArgEmail = &email
 }
@@ -129,4 +147,8 @@ func (x *UserGETstruct) SetLimit(limit int) {
 
 func (x *UserGETstruct) SetName(name string) {
 	x.ArgName = &name
+}
+
+func (x *UserGETstruct) SetOffset(offset int) {
+	x.ArgOffset = &offset
 }

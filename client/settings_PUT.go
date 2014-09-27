@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 func (c *Client) SettingsPUT() *SettingsPUTstruct {
@@ -49,8 +51,25 @@ func (x *SettingsPUTstruct) Do() (*http.Response, error) {
 		log.Fatalf("error marshalling %v", err)
 	}
 	body := bytes.NewReader(json)
-	//request, err := http.NewRequest(x.Method(), x.dapAddr+x.Location(), body)
-	request, err := http.NewRequest(x.Method(), "http://"+x.Location(), body)
+
+	// location may have parameters in it (/blah/:foo/blah/:bar)
+	// these must match to an Arg value on the struct and be replaced.
+	l := x.Location()
+	strconv.ParseBool("true")
+	if x.ArgUser_id != nil {
+		l = strings.Replace(l, ":user_id", strconv.Itoa(*x.ArgUser_id), -1)
+	}
+	if x.ArgEnabled != nil {
+		l = strings.Replace(l, ":enabled", strconv.FormatBool(*x.ArgEnabled), -1)
+	}
+	if x.ArgId != nil {
+		l = strings.Replace(l, ":id", strconv.Itoa(*x.ArgId), -1)
+	}
+	if x.ArgSetting != nil {
+		l = strings.Replace(l, ":setting", *x.ArgSetting, -1)
+	}
+
+	request, err := http.NewRequest(x.Method(), "http://"+l, body)
 	if err != nil {
 		// TODO: proper error handling
 		log.Fatalf("error with new request %v", err)
@@ -109,10 +128,6 @@ func (x *SettingsPUTstruct) Failure() *ErrorResponse {
 
 // accessor functions
 
-func (x *SettingsPUTstruct) SetEnabled(enabled bool) {
-	x.ArgEnabled = &enabled
-}
-
 func (x *SettingsPUTstruct) SetId(id int) {
 	x.ArgId = &id
 }
@@ -123,4 +138,8 @@ func (x *SettingsPUTstruct) SetSetting(setting string) {
 
 func (x *SettingsPUTstruct) SetUser_id(user_id int) {
 	x.ArgUser_id = &user_id
+}
+
+func (x *SettingsPUTstruct) SetEnabled(enabled bool) {
+	x.ArgEnabled = &enabled
 }

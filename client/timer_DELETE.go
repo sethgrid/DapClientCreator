@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 func (c *Client) TimerDELETE() *TimerDELETEstruct {
@@ -13,12 +15,12 @@ func (c *Client) TimerDELETE() *TimerDELETEstruct {
 }
 
 type TimerDELETEstruct struct {
-	ArgPlace_id   *string  `json:"place_id,omitempty"`
-	ArgTimer_ms   *int     `json:"timer_ms,omitempty"`
 	ArgCreated_at *float32 `json:"created_at,omitempty"`
 	ArgId         *int     `json:"id,omitempty"`
 	ArgIp         *int     `json:"ip,omitempty"`
 	ArgLimit      *int     `json:"limit,omitempty"`
+	ArgPlace_id   *string  `json:"place_id,omitempty"`
+	ArgTimer_ms   *int     `json:"timer_ms,omitempty"`
 
 	httpClient *http.Client
 	response   *http.Response
@@ -26,12 +28,12 @@ type TimerDELETEstruct struct {
 }
 
 type TimerDELETEresponse struct {
-	Created_at string `json:"created_at"`
-	Id         string `json:"id"`
-	Ip         string `json:"ip"`
 	Limit      string `json:"limit"`
 	Place_id   string `json:"place_id"`
 	Timer_ms   string `json:"timer_ms"`
+	Created_at string `json:"created_at"`
+	Id         string `json:"id"`
+	Ip         string `json:"ip"`
 }
 
 func (x *TimerDELETEstruct) Method() string {
@@ -53,8 +55,31 @@ func (x *TimerDELETEstruct) Do() (*http.Response, error) {
 		log.Fatalf("error marshalling %v", err)
 	}
 	body := bytes.NewReader(json)
-	//request, err := http.NewRequest(x.Method(), x.dapAddr+x.Location(), body)
-	request, err := http.NewRequest(x.Method(), "http://"+x.Location(), body)
+
+	// location may have parameters in it (/blah/:foo/blah/:bar)
+	// these must match to an Arg value on the struct and be replaced.
+	l := x.Location()
+	strconv.ParseBool("true")
+	if x.ArgId != nil {
+		l = strings.Replace(l, ":id", strconv.Itoa(*x.ArgId), -1)
+	}
+	if x.ArgIp != nil {
+		l = strings.Replace(l, ":ip", strconv.Itoa(*x.ArgIp), -1)
+	}
+	if x.ArgLimit != nil {
+		l = strings.Replace(l, ":limit", strconv.Itoa(*x.ArgLimit), -1)
+	}
+	if x.ArgPlace_id != nil {
+		l = strings.Replace(l, ":place_id", *x.ArgPlace_id, -1)
+	}
+	if x.ArgTimer_ms != nil {
+		l = strings.Replace(l, ":timer_ms", strconv.Itoa(*x.ArgTimer_ms), -1)
+	}
+	if x.ArgCreated_at != nil {
+		l = strings.Replace(l, ":created_at", strconv.FormatFloat(float64(*x.ArgCreated_at), 'f', -1, 32), -1)
+	}
+
+	request, err := http.NewRequest(x.Method(), "http://"+l, body)
 	if err != nil {
 		// TODO: proper error handling
 		log.Fatalf("error with new request %v", err)
@@ -113,14 +138,6 @@ func (x *TimerDELETEstruct) Failure() *ErrorResponse {
 
 // accessor functions
 
-func (x *TimerDELETEstruct) SetCreated_at(created_at float32) {
-	x.ArgCreated_at = &created_at
-}
-
-func (x *TimerDELETEstruct) SetId(id int) {
-	x.ArgId = &id
-}
-
 func (x *TimerDELETEstruct) SetIp(ip int) {
 	x.ArgIp = &ip
 }
@@ -135,4 +152,12 @@ func (x *TimerDELETEstruct) SetPlace_id(place_id string) {
 
 func (x *TimerDELETEstruct) SetTimer_ms(timer_ms int) {
 	x.ArgTimer_ms = &timer_ms
+}
+
+func (x *TimerDELETEstruct) SetCreated_at(created_at float32) {
+	x.ArgCreated_at = &created_at
+}
+
+func (x *TimerDELETEstruct) SetId(id int) {
+	x.ArgId = &id
 }

@@ -98,6 +98,7 @@ func createTemplateFile(m meta.Meta) {
 		"structResponseHelper": structResponseHelper,
 		"accessorHelper":       accessorHelper,
 		"requiredList":         requiredList,
+		"locationHelper":       locationHelper,
 	}
 
 	tmpl, err := template.New("myTemplate").Funcs(funcMap).Parse(OUTPUT_FILE)
@@ -110,7 +111,7 @@ func createTemplateFile(m meta.Meta) {
 		log.Fatal("unable to get working directory ", err)
 	}
 	path := dir + "/" + templateDir
-	log.Println("removing templateDir")
+	log.Println(fmt.Sprintf("creating %s_%s.go", m.Title, m.Method))
 
 	f, err := os.Create(fmt.Sprintf("%s/%s_%s.go", path, m.Title, m.Method))
 	defer f.Close()
@@ -172,6 +173,42 @@ func accessorHelper(m meta.Meta) string {
 	return returnString
 }
 
+func locationHelper(m meta.Meta) string {
+	// many of the possible returnStrings require strconv, but not all.
+	// make sure that strconv is used to avoid import errors
+	returnString := "strconv.ParseBool(\"true\")"
+
+	// above wont work due to "value" needing to be dynamic each run.
+	// will have to do multiple replacement attempts
+	for k, v := range m.Properties {
+		returnString += `
+		if x.Arg` + strings.Title(k) + ` != nil{`
+		switch v.DataType {
+		case "timestamp":
+			returnString += `
+			l = strings.Replace(l, ":` + k + `", strconv.FormatFloat(float64(*x.Arg` + strings.Title(k) + `), 'f', -1, 32), -1)`
+		case "varchar":
+			returnString += `
+			l = strings.Replace(l, ":` + k + `", *x.Arg` + strings.Title(k) + `, -1)`
+		case "tinyint":
+			returnString += `
+			l = strings.Replace(l, ":` + k + `", strconv.FormatBool(*x.Arg` + strings.Title(k) + `), -1)`
+		case "int":
+			returnString += `
+			l = strings.Replace(l, ":` + k + `", strconv.Itoa(*x.Arg` + strings.Title(k) + `), -1)`
+		default:
+			// TODO: add notifications/logging to discover this early
+			returnString += `
+			// unknown datatype ` + v.DataType + `
+			//l = strings.Replace(l, ":` + k + `", *x.Arg` + strings.Title(k) + `, -1)`
+		}
+		returnString += `
+		}`
+	}
+
+	return returnString
+}
+
 func Mysql2GoType(MysqlType string) string {
 	var GoType string
 
@@ -221,6 +258,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
+	"strconv"
 )
 
 func (c *Client) {{title .Title}}{{title .Method}}() *{{title .Title}}{{title .Method}}struct {
@@ -258,8 +297,13 @@ func (x *{{title .Title}}{{title .Method}}struct) Do() (*http.Response, error) {
 		log.Fatalf("error marshalling %v", err)
 	}
 	body := bytes.NewReader(json)
-	//request, err := http.NewRequest(x.Method(), x.dapAddr+x.Location(), body)
-	request, err := http.NewRequest(x.Method(), "http://"+x.Location(), body)
+
+	// location may have parameters in it (/blah/:foo/blah/:bar)
+	// these must match to an Arg value on the struct and be replaced.
+	l := x.Location()
+	{{ locationHelper . }}
+
+	request, err := http.NewRequest(x.Method(), "http://"+l, body)
 	if err != nil {
 		// TODO: proper error handling
 		log.Fatalf("error with new request %v", err)

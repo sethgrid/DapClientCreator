@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 func (c *Client) CustomFooPOST() *CustomFooPOSTstruct {
@@ -33,7 +35,7 @@ func (x *CustomFooPOSTstruct) Required() []string {
 }
 
 func (x *CustomFooPOSTstruct) Location() string {
-	return "api/v1/custom/endpoint"
+	return "localhost:9000/api/v1/custom/foo/:sample_property"
 }
 
 func (x *CustomFooPOSTstruct) Do() (*http.Response, error) {
@@ -43,8 +45,16 @@ func (x *CustomFooPOSTstruct) Do() (*http.Response, error) {
 		log.Fatalf("error marshalling %v", err)
 	}
 	body := bytes.NewReader(json)
-	//request, err := http.NewRequest(x.Method(), x.dapAddr+x.Location(), body)
-	request, err := http.NewRequest(x.Method(), "http://"+x.Location(), body)
+
+	// location may have parameters in it (/blah/:foo/blah/:bar)
+	// these must match to an Arg value on the struct and be replaced.
+	l := x.Location()
+	strconv.ParseBool("true")
+	if x.ArgSample_property != nil {
+		l = strings.Replace(l, ":sample_property", *x.ArgSample_property, -1)
+	}
+
+	request, err := http.NewRequest(x.Method(), "http://"+l, body)
 	if err != nil {
 		// TODO: proper error handling
 		log.Fatalf("error with new request %v", err)

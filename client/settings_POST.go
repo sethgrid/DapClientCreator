@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 )
 
 func (c *Client) SettingsPOST() *SettingsPOSTstruct {
@@ -13,10 +15,10 @@ func (c *Client) SettingsPOST() *SettingsPOSTstruct {
 }
 
 type SettingsPOSTstruct struct {
-	ArgEnabled *bool   `json:"enabled,omitempty"`
 	ArgId      *int    `json:"id,omitempty"`
 	ArgSetting *string `json:"setting,omitempty"`
 	ArgUser_id *int    `json:"user_id,omitempty"`
+	ArgEnabled *bool   `json:"enabled,omitempty"`
 
 	httpClient *http.Client
 	response   *http.Response
@@ -49,8 +51,25 @@ func (x *SettingsPOSTstruct) Do() (*http.Response, error) {
 		log.Fatalf("error marshalling %v", err)
 	}
 	body := bytes.NewReader(json)
-	//request, err := http.NewRequest(x.Method(), x.dapAddr+x.Location(), body)
-	request, err := http.NewRequest(x.Method(), "http://"+x.Location(), body)
+
+	// location may have parameters in it (/blah/:foo/blah/:bar)
+	// these must match to an Arg value on the struct and be replaced.
+	l := x.Location()
+	strconv.ParseBool("true")
+	if x.ArgSetting != nil {
+		l = strings.Replace(l, ":setting", *x.ArgSetting, -1)
+	}
+	if x.ArgUser_id != nil {
+		l = strings.Replace(l, ":user_id", strconv.Itoa(*x.ArgUser_id), -1)
+	}
+	if x.ArgEnabled != nil {
+		l = strings.Replace(l, ":enabled", strconv.FormatBool(*x.ArgEnabled), -1)
+	}
+	if x.ArgId != nil {
+		l = strings.Replace(l, ":id", strconv.Itoa(*x.ArgId), -1)
+	}
+
+	request, err := http.NewRequest(x.Method(), "http://"+l, body)
 	if err != nil {
 		// TODO: proper error handling
 		log.Fatalf("error with new request %v", err)
@@ -109,6 +128,10 @@ func (x *SettingsPOSTstruct) Failure() *ErrorResponse {
 
 // accessor functions
 
+func (x *SettingsPOSTstruct) SetUser_id(user_id int) {
+	x.ArgUser_id = &user_id
+}
+
 func (x *SettingsPOSTstruct) SetEnabled(enabled bool) {
 	x.ArgEnabled = &enabled
 }
@@ -119,8 +142,4 @@ func (x *SettingsPOSTstruct) SetId(id int) {
 
 func (x *SettingsPOSTstruct) SetSetting(setting string) {
 	x.ArgSetting = &setting
-}
-
-func (x *SettingsPOSTstruct) SetUser_id(user_id int) {
-	x.ArgUser_id = &user_id
 }
