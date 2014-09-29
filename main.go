@@ -93,7 +93,7 @@ func createBaseTemplateFiles() {
 
 func createTemplateFile(m meta.Meta) {
 	funcMap := template.FuncMap{
-		"title":                strings.Title,
+		"title":                protectKeywords,
 		"structHelper":         structHelper,
 		"structResponseHelper": structResponseHelper,
 		"accessorHelper":       accessorHelper,
@@ -138,7 +138,7 @@ func structHelper(m meta.Meta) string {
 
 	for name, info := range m.Properties {
 		returnString += fmt.Sprintf("Arg%s *%s `json:\"%s,omitempty\"`\n",
-			strings.Title(name), Mysql2GoType(info.DataType), name)
+			strings.Title(protectKeywords(name)), Mysql2GoType(info.DataType), strings.ToLower(protectKeywords(name)))
 	}
 	return returnString
 }
@@ -148,7 +148,7 @@ func structResponseHelper(m meta.Meta) string {
 
 	for name, _ := range m.Properties {
 		returnString += fmt.Sprintf("%s string `json:\"%s\"`\n",
-			strings.Title(name), name)
+			strings.Title(protectKeywords(name)), protectKeywords(name))
 	}
 	return returnString
 }
@@ -162,15 +162,35 @@ func accessorHelper(m meta.Meta) string {
 				x.Arg%s = &%s
 			}
 			`,
-			strings.Title(m.Title),
+			strings.Title(protectKeywords(m.Title)),
 			strings.Title(m.Method),
-			strings.Title(name),
-			name,
+			strings.Title(protectKeywords(name)),
+			protectKeywords(name),
 			Mysql2GoType(info.DataType),
-			strings.Title(name),
-			name)
+			strings.Title(protectKeywords(name)),
+			protectKeywords(name))
 	}
 	return returnString
+}
+
+func protectKeywords(w string) string {
+	switch w {
+	// whatever we go with, we need to make sure the structs stay exportable (no prepend _)
+	case "type":
+		return strings.Title(w) + "_"
+	case "package":
+		return strings.Title(w) + "_"
+	case "func":
+		return strings.Title(w) + "_"
+	case "var":
+		return strings.Title(w) + "_"
+		// TODO - fix my keywords in dap to not use Offset and Limit. Conflicts started as noted below.
+		// case "offset":
+		// 	return strings.Title(w) + "_"
+		// case "limit":
+		// 	return strings.Title(w) + "_"
+	}
+	return strings.Title(w)
 }
 
 func locationHelper(m meta.Meta) string {
@@ -182,25 +202,25 @@ func locationHelper(m meta.Meta) string {
 	// will have to do multiple replacement attempts
 	for k, v := range m.Properties {
 		returnString += `
-		if x.Arg` + strings.Title(k) + ` != nil{`
+		if x.Arg` + protectKeywords(k) + ` != nil{`
 		switch v.DataType {
 		case "timestamp":
 			returnString += `
-			l = strings.Replace(l, ":` + k + `", strconv.FormatFloat(float64(*x.Arg` + strings.Title(k) + `), 'f', -1, 32), -1)`
+			l = strings.Replace(l, ":` + k + `", strconv.FormatFloat(float64(*x.Arg` + protectKeywords(k) + `), 'f', -1, 32), -1)`
 		case "varchar":
 			returnString += `
-			l = strings.Replace(l, ":` + k + `", *x.Arg` + strings.Title(k) + `, -1)`
+			l = strings.Replace(l, ":` + k + `", *x.Arg` + protectKeywords(k) + `, -1)`
 		case "tinyint":
 			returnString += `
-			l = strings.Replace(l, ":` + k + `", strconv.FormatBool(*x.Arg` + strings.Title(k) + `), -1)`
+			l = strings.Replace(l, ":` + k + `", strconv.FormatBool(*x.Arg` + protectKeywords(k) + `), -1)`
 		case "int":
 			returnString += `
-			l = strings.Replace(l, ":` + k + `", strconv.Itoa(*x.Arg` + strings.Title(k) + `), -1)`
+			l = strings.Replace(l, ":` + k + `", strconv.Itoa(*x.Arg` + protectKeywords(k) + `), -1)`
 		default:
 			// TODO: add notifications/logging to discover this early
 			returnString += `
 			// unknown datatype ` + v.DataType + `
-			//l = strings.Replace(l, ":` + k + `", *x.Arg` + strings.Title(k) + `, -1)`
+			//l = strings.Replace(l, ":` + k + `", *x.Arg` + protectKeywords(k) + `, -1)`
 		}
 		returnString += `
 		}`
@@ -263,6 +283,10 @@ import (
 )
 
 func (c *Client) {{title .Title}}{{title .Method}}() *{{title .Title}}{{title .Method}}struct {
+	// avoid missing import error
+	if false{
+		strings.Title("foo")
+	}
 	return &{{title .Title}}{{title .Method}}struct{httpClient: c.HttpClient, dapAddr: c.DapAddr}
 }
 
