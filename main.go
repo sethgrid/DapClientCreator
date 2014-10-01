@@ -77,23 +77,12 @@ func createBaseTemplateFiles() {
 		log.Fatal("unable to create templateDir ", err)
 	}
 
-	log.Println("creating client.go")
-	f, err := os.OpenFile(path+"/client.go", os.O_WRONLY|os.O_CREATE, 0655)
-	defer f.Close()
-	if err != nil {
-		log.Fatal("unable to create client.go ", err)
-	}
-
-	content := client_file()
-	_, err = f.Write([]byte(content))
-	if err != nil {
-		log.Fatal("unable write to client.go ", err)
-	}
 }
 
 func createTemplateFile(m meta.Meta) {
 	funcMap := template.FuncMap{
-		"title":                protectKeywords,
+		"title":                protectKeywordsUpper,
+		"lower":                protectKeywordsLower,
 		"structHelper":         structHelper,
 		"structResponseHelper": structResponseHelper,
 		"accessorHelper":       accessorHelper,
@@ -111,9 +100,13 @@ func createTemplateFile(m meta.Meta) {
 		log.Fatal("unable to get working directory ", err)
 	}
 	path := dir + "/" + templateDir
-	log.Println(fmt.Sprintf("creating %s_%s.go", m.Title, m.Method))
+	err = os.Mkdir(path+"/"+m.Title, 0777)
+	if err != nil && os.IsExist(err) != true {
+		log.Fatal("unable to create client subpackage directory ", err)
+	}
+	log.Println(fmt.Sprintf("creating %s/%s_%s.go", m.Title, m.Title, m.Method))
 
-	f, err := os.Create(fmt.Sprintf("%s/%s_%s.go", path, m.Title, m.Method))
+	f, err := os.Create(fmt.Sprintf("%s/%s/%s_%s.go", path, m.Title, m.Title, m.Method))
 	defer f.Close()
 	if err != nil {
 		log.Fatal("unable to create template file ", err)
@@ -122,6 +115,22 @@ func createTemplateFile(m meta.Meta) {
 	err = tmpl.Execute(f, m)
 	if err != nil {
 		log.Fatal("unable to execute template ", err)
+	}
+
+	clientFile := path + "/" + m.Title + "/client.go"
+	if _, err := os.Stat(clientFile); os.IsNotExist(err) {
+		log.Println("creating local client.go")
+		f, err := os.OpenFile(clientFile, os.O_WRONLY|os.O_CREATE, 0655)
+		defer f.Close()
+		if err != nil {
+			log.Fatal("unable to create client.go ", err)
+		}
+
+		content := client_file(m.Title)
+		_, err = f.Write([]byte(content))
+		if err != nil {
+			log.Fatal("unable write to client.go ", err)
+		}
 	}
 }
 
@@ -146,9 +155,9 @@ func structHelper(m meta.Meta) string {
 func structResponseHelper(m meta.Meta) string {
 	var returnString string
 
-	for name, _ := range m.Properties {
-		returnString += fmt.Sprintf("%s string `json:\"%s\"`\n",
-			strings.Title(protectKeywords(name)), protectKeywords(name))
+	for name, info := range m.Properties {
+		returnString += fmt.Sprintf("%s %s `json:\"%s\"`\n",
+			strings.Title(protectKeywords(name)), Mysql2GoType(info.DataType), strings.ToLower(protectKeywords(name)))
 	}
 	return returnString
 }
@@ -162,35 +171,45 @@ func accessorHelper(m meta.Meta) string {
 				x.Arg%s = &%s
 			}
 			`,
-			strings.Title(protectKeywords(m.Title)),
+			protectKeywordsLower(m.Title),
 			strings.Title(m.Method),
-			strings.Title(protectKeywords(name)),
+
+			protectKeywordsUpper(name),
 			protectKeywords(name),
 			Mysql2GoType(info.DataType),
-			strings.Title(protectKeywords(name)),
+
+			protectKeywordsUpper(name),
 			protectKeywords(name))
 	}
 	return returnString
+}
+
+func protectKeywordsUpper(w string) string {
+	return strings.Title(protectKeywords(w))
+}
+
+func protectKeywordsLower(w string) string {
+	return strings.ToLower(protectKeywords(w))
 }
 
 func protectKeywords(w string) string {
 	switch w {
 	// whatever we go with, we need to make sure the structs stay exportable (no prepend _)
 	case "type":
-		return strings.Title(w) + "_"
+		return w + "_"
 	case "package":
-		return strings.Title(w) + "_"
+		return w + "_"
 	case "func":
-		return strings.Title(w) + "_"
+		return w + "_"
 	case "var":
-		return strings.Title(w) + "_"
+		return w + "_"
 		// TODO - fix my keywords in dap to not use Offset and Limit. Conflicts started as noted below.
 		// case "offset":
 		// 	return strings.Title(w) + "_"
 		// case "limit":
 		// 	return strings.Title(w) + "_"
 	}
-	return strings.Title(w)
+	return w
 }
 
 func locationHelper(m meta.Meta) string {
@@ -202,25 +221,30 @@ func locationHelper(m meta.Meta) string {
 	// will have to do multiple replacement attempts
 	for k, v := range m.Properties {
 		returnString += `
-		if x.Arg` + protectKeywords(k) + ` != nil{`
+		if x.Arg` + protectKeywordsUpper(k) + ` != nil{`
 		switch v.DataType {
 		case "timestamp":
 			returnString += `
-			l = strings.Replace(l, ":` + k + `", strconv.FormatFloat(float64(*x.Arg` + protectKeywords(k) + `), 'f', -1, 32), -1)`
+			l = strings.Replace(l, ":` + k + `", strconv.FormatFloat(float64(*x.Arg` + protectKeywordsUpper(k) + `), 'f', -1, 32), -1)`
 		case "varchar":
 			returnString += `
-			l = strings.Replace(l, ":` + k + `", *x.Arg` + protectKeywords(k) + `, -1)`
+			l = strings.Replace(l, ":` + k + `", *x.Arg` + protectKeywordsUpper(k) + `, -1)`
 		case "tinyint":
+			// canot formatbool due to json decoder issue (int=>bool)
 			returnString += `
-			l = strings.Replace(l, ":` + k + `", strconv.FormatBool(*x.Arg` + protectKeywords(k) + `), -1)`
+			l = strings.Replace(l, ":` + k + `", strconv.Itoa(*x.Arg` + protectKeywordsUpper(k) + `), -1)`
+		case "smallint":
+			// canot formatbool due to json decoder issue (int=>bool)
+			returnString += `
+			l = strings.Replace(l, ":` + k + `", strconv.Itoa(*x.Arg` + protectKeywordsUpper(k) + `), -1)`
 		case "int":
 			returnString += `
-			l = strings.Replace(l, ":` + k + `", strconv.Itoa(*x.Arg` + protectKeywords(k) + `), -1)`
+			l = strings.Replace(l, ":` + k + `", strconv.Itoa(*x.Arg` + protectKeywordsUpper(k) + `), -1)`
 		default:
 			// TODO: add notifications/logging to discover this early
 			returnString += `
 			// unknown datatype ` + v.DataType + `
-			//l = strings.Replace(l, ":` + k + `", *x.Arg` + protectKeywords(k) + `, -1)`
+			//l = strings.Replace(l, ":` + k + `", *x.Arg` + protectKeywordsUpper(k) + `, -1)`
 		}
 		returnString += `
 		}`
@@ -238,7 +262,9 @@ func Mysql2GoType(MysqlType string) string {
 	case "varchar":
 		GoType = "string"
 	case "tinyint":
-		GoType = "bool"
+		GoType = "int" // cannot yet use bool. json decoding issue type int=>bool... custom decoder?
+	case "smallint":
+		GoType = "int" // cannot yet use bool. json decoding issue type int=>bool... custom decoder?
 	case "int":
 		GoType = "int"
 	default:
@@ -271,7 +297,7 @@ func Mysql2GoType(MysqlType string) string {
     }
 */
 
-const OUTPUT_FILE = `package DapClient
+const OUTPUT_FILE = `package {{ lower .Title}}
 import (
 	"bytes"
 	"encoding/json"
@@ -282,15 +308,8 @@ import (
 	"strconv"
 )
 
-func (c *Client) {{title .Title}}{{title .Method}}() *{{title .Title}}{{title .Method}}struct {
-	// avoid missing import error
-	if false{
-		strings.Title("foo")
-	}
-	return &{{title .Title}}{{title .Method}}struct{httpClient: c.HttpClient, dapAddr: c.DapAddr}
-}
 
-type {{title .Title}}{{title .Method}}struct struct{
+type {{lower .Title}}{{title .Method}}struct struct{
 	{{ structHelper . }}
 
 	httpClient *http.Client
@@ -298,23 +317,31 @@ type {{title .Title}}{{title .Method}}struct struct{
 	dapAddr    string
 }
 
+func (c *Client) {{title .Title}}{{title .Method}}() *{{lower .Title}}{{title .Method}}struct {
+	// avoid missing import error
+	if false{
+		strings.Title("foo")
+	}
+	return &{{lower .Title}}{{title .Method}}struct{httpClient: c.HttpClient, dapAddr: c.DapAddr}
+}
+
 type {{title .Title}}{{title .Method}}response struct{
 	{{ structResponseHelper . }}
 }
 
-func (x *{{title .Title}}{{title .Method}}struct) Method() string{
+func (x *{{lower .Title}}{{title .Method}}struct) Method() string{
 	return {{ .Method }}
 }
 
-func (x *{{title .Title}}{{title .Method}}struct) Required() []string{
+func (x *{{lower .Title}}{{title .Method}}struct) Required() []string{
 	return []string{ {{ requiredList . }} }
 }
 
-func (x *{{title .Title}}{{title .Method}}struct) Location() string {
+func (x *{{lower .Title}}{{title .Method}}struct) Location() string {
 	return "{{ .Location }}"
 }
 
-func (x *{{title .Title}}{{title .Method}}struct) Do() (*http.Response, error) {
+func (x *{{lower .Title}}{{title .Method}}struct) Do() (*http.Response, error) {
 	json, err := json.Marshal(x)
 	if err != nil {
 		// TODO: proper error handling
@@ -341,21 +368,27 @@ func (x *{{title .Title}}{{title .Method}}struct) Do() (*http.Response, error) {
 	return response, nil
 }
 
-func (x *{{title .Title}}{{title .Method}}struct) Success() []{{title .Title}}{{title .Method}}response {
+func (x *{{lower .Title}}{{title .Method}}struct) Success() []{{title .Title}}{{title .Method}}response {
 	if x.response == nil {
 		return nil
 	}
 
 	// get the response body and put it back (as reading drains the response)
 	data, err := ioutil.ReadAll(x.response.Body)
-	x.response.Body = ioutil.NopCloser(bytes.NewReader(data))
-
 	if err != nil {
 		// TODO: proper error handling
 		log.Fatalf("error reading body %v", err)
 	}
+
 	response := make([]{{title .Title}}{{title .Method}}response, 0)
-	err = json.Unmarshal(data, &response)
+
+	x.response.Body = ioutil.NopCloser(bytes.NewReader(data))
+
+	dataReader := bytes.NewReader(data)
+	// decoder is better than unmarshall at handling streams
+	decoder := json.NewDecoder(dataReader)
+    err = decoder.Decode(&response)
+
 	if err != nil {
 		// TODO: proper error handling
 		log.Fatalf("error reading sucesss body %v", err)
@@ -363,7 +396,7 @@ func (x *{{title .Title}}{{title .Method}}struct) Success() []{{title .Title}}{{
 	return response
 }
 
-func (x *{{title .Title}}{{title .Method}}struct) Failure() *ErrorResponse {
+func (x *{{lower .Title}}{{title .Method}}struct) Failure() *ErrorResponse {
 	if x.response == nil {
 		return nil
 	}
@@ -389,8 +422,8 @@ func (x *{{title .Title}}{{title .Method}}struct) Failure() *ErrorResponse {
 
 `
 
-func client_file() string {
-	return `package DapClient
+func client_file(packageName string) string {
+	return `package ` + protectKeywords(packageName) + `
 
 import (
 	"net/http"
