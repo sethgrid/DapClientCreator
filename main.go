@@ -229,6 +229,12 @@ func locationHelper(m meta.Meta) string {
 		case "varchar":
 			returnString += `
 			l = strings.Replace(l, ":` + k + `", *x.Arg` + protectKeywordsUpper(k) + `, -1)`
+		case "datetime":
+			returnString += `
+			l = strings.Replace(l, ":` + k + `", *x.Arg` + protectKeywordsUpper(k) + `, -1)`
+		case "char":
+			returnString += `
+			l = strings.Replace(l, ":` + k + `", *x.Arg` + protectKeywordsUpper(k) + `, -1)`
 		case "tinyint":
 			// canot formatbool due to json decoder issue (int=>bool)
 			returnString += `
@@ -267,6 +273,10 @@ func Mysql2GoType(MysqlType string) string {
 		GoType = "int" // cannot yet use bool. json decoding issue type int=>bool... custom decoder?
 	case "int":
 		GoType = "int"
+	case "datetime":
+		GoType = "string"
+	case "char":
+		GoType = "string"
 	default:
 		GoType = "string"
 	}
