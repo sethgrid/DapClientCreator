@@ -4,81 +4,37 @@ Sample Client:
 package main
 
 import (
-	"io/ioutil"
 	"log"
 
-	"github.com/sendgrid/DapClientCreator/client"
+	"github.com/sendgrid/DapClientCreator/client/user"
 )
 
 func main() {
 	log.Println("starting")
-	client, err := DapClient.New("localhost:9000")
+	client, err := user.New("localhost:9000")
 	if err != nil {
 		log.Fatalf("Cannot create client: %v", err)
 	}
 
-	log.Println("client created. attempting post...")
-	setter := client.CustomFooPOST()
-	setter.SetSample_property("this is my sample property")
-	setterResponse, err := setter.Do()
+	getter := client.UserGET()
+
+	getter.SetLimit(2) // example, does not make sense in this case
+	getter.SetId(180)
+	_, err = getter.Do()
 	if err != nil {
-		log.Println("error with CustomFooPOST ", err)
-	}
-	log.Println(setterResponse.StatusCode)
-	setterResponseBody, _ := ioutil.ReadAll(setterResponse.Body)
-	log.Printf("%s\n", setterResponseBody)
-
-	getter := client.CustomFooGET()
-	getter.SetSample_property("this is my sample property")
-	getterResponse, err := getter.Do()
-	if err != nil {
-		log.Println("error with CustomFooGET ", err)
-	}
-	log.Println(getterResponse.StatusCode)
-	getterResponseBody, _ := ioutil.ReadAll(getterResponse.Body)
-	log.Printf("%s\n", getterResponseBody)
-
-	log.Println("Get Settings...")
-
-	get := client.SettingsGET()
-
-	responseA, err := get.Do()
-	if err != nil {
-		log.Fatal(err)
+		log.Println("unable to get user 180 ", err)
 	}
 
-	if responseA.StatusCode == 200 {
-		res := get.Success()
+	data := getter.Success()
 
-		for _, successCase := range res {
-			log.Printf("Success: User ID (%v) Enabled (%v) Setting (%v)\n", successCase.User_id, successCase.Enabled, successCase.Setting)
-		}
-	} else {
-		res := get.Failure()
-		log.Printf("Failure: %s", res.Error)
-	}
+	log.Printf("response: %+v", data)
 
-	log.Println("Read response body...")
+	// we do not want to collect the response from the *.Do()
+	// we can, and we can inspect it, but we drain the response body at that point
+	// and it will not be available to the *.Success() call.
 
-	content, err := ioutil.ReadAll(responseA.Body)
-	log.Printf("content: %s %v", content, err)
+	// body, _ := ioutil.ReadAll(resp.Body) // err: is_new_newsletter string vs int
+	// log.Printf("raw response %s", body)
 
-	log.Println("Post Settings...")
 
-	post := client.SettingsPOST()
-
-	post.SetEnabled(true)
-	post.SetId(13)
-	post.SetSetting("some other setting")
-	post.SetUser_id(1)
-
-	responseB, err := post.Do()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Printf("Status Response POST: %v", responseB.Status)
-	log.Println("Read Response Body...")
-	content, err = ioutil.ReadAll(responseB.Body)
-	log.Printf("body: %s \nErr: %v", content, err)
 }
